@@ -50,4 +50,6 @@ It acts as a **virtual mentor** by analyzing ideas, generating tasks, and guidin
 - **hooks/** → Custom React hooks
 - **public/** → Static assets
 
+hackmate-n8xbvg93g-lokis-projects-08584ceb.vercel.app
+
 
