@@ -19,9 +19,14 @@ export interface UserProfile {
   user_id: string
   name: string
   email: string
-  role: "admin" | "member" | "viewer"
+  role: "lead" | "developer" | "designer" | "researcher" | "admin"
   skills: string[]
   online_status: boolean
+  availability: "available" | "busy" | "offline"
+  timezone?: string
+  github_username?: string
+  hours_worked?: number
+  tasks_completed?: number
   created_at?: Date
 }
 
@@ -35,6 +40,7 @@ interface AuthContextType {
   signInAsGuest: () => Promise<void>
   logout: () => Promise<void>
   updateUserSkills: (skills: string[]) => Promise<void>
+  updateUserProfile: (updates: Partial<UserProfile>) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -44,9 +50,13 @@ function createDefaultProfile(user: User): UserProfile {
     user_id: user.uid,
     name: user.displayName || user.email?.split("@")[0] || "User",
     email: user.email || "",
-    role: "member",
+    role: "developer",
     skills: [],
     online_status: true,
+    availability: "available",
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    hours_worked: 0,
+    tasks_completed: 0,
   }
 }
 
@@ -98,9 +108,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user_id: user.uid,
       name: name || (isGuest ? `Guest_${user.uid.slice(0, 6)}` : "User"),
       email: user.email || "",
-      role: "member",
+      role: "developer",
       skills: [],
       online_status: true,
+      availability: "available",
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      hours_worked: 0,
+      tasks_completed: 0,
     }
     setUserProfile(profile)
 
@@ -180,6 +194,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const updateUserProfile = async (updates: Partial<UserProfile>) => {
+    const db = getFirebaseDb()
+    if (user) {
+      setUserProfile((prev) => (prev ? { ...prev, ...updates } : null))
+      if (db) {
+        setDoc(doc(db, "users", user.uid), updates, { merge: true }).catch(() => {})
+      }
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -192,6 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInAsGuest,
         logout,
         updateUserSkills,
+        updateUserProfile,
       }}
     >
       {children}

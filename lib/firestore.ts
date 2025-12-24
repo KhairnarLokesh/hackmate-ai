@@ -14,7 +14,7 @@ import {
   writeBatch,
 } from "firebase/firestore"
 import { getFirebaseDb } from "./firebase"
-import type { Project, Task, ChatMessage, ProjectMember } from "./types"
+import type { Project, Task, ChatMessage, ProjectMember, SharedResource, LiveActivity, TeamNotification, Milestone, ScheduleEvent, WellnessSettings } from "./types"
 
 function getDb() {
   const db = getFirebaseDb()
@@ -52,6 +52,12 @@ export async function createProject(name: string, duration: "24h" | "48h", userI
     join_code: generateJoinCode(),
     demo_mode: false,
     created_at: serverTimestamp(),
+    status: "planning",
+    github_repo: null,
+    demo_url: null,
+    pitch_deck_url: null,
+    submission_deadline: null,
+    hackathon_event: null,
   }
 
   await setDoc(projectRef, project)
@@ -62,6 +68,9 @@ export async function createProject(name: string, duration: "24h" | "48h", userI
     user_id: userId,
     role: "admin",
   }).catch(() => {})
+
+  // Create default milestones in background
+  createDefaultMilestones(projectRef.id, duration).catch(() => {})
 
   return projectRef.id
 }
@@ -98,7 +107,7 @@ export async function getUserProjects(userId: string): Promise<Project[]> {
       } as Project
     })
 
-    return projects.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    return projects.sort((a: Project, b: Project) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
   } catch (error) {
     console.error("Error getting user projects:", error)
     return []
@@ -147,6 +156,16 @@ export async function toggleDemoMode(projectId: string, enabled: boolean): Promi
 export async function updateDemoMode(projectId: string, enabled: boolean): Promise<void> {
   const db = getDb()
   await updateDoc(doc(db, "projects", projectId), { demo_mode: enabled })
+}
+
+export async function updateProjectUrls(projectId: string, urls: { github_repo?: string; demo_url?: string; pitch_deck_url?: string }): Promise<void> {
+  const db = getDb()
+  await updateDoc(doc(db, "projects", projectId), urls)
+}
+
+export async function updateProjectStatus(projectId: string, status: Project["status"]): Promise<void> {
+  const db = getDb()
+  await updateDoc(doc(db, "projects", projectId), { status })
 }
 
 export async function deleteProject(projectId: string): Promise<void> {
@@ -213,11 +232,17 @@ export function subscribeToProject(projectId: string, callback: (project: Projec
 export async function createTask(task: Omit<Task, "task_id" | "last_updated">): Promise<string> {
   const db = getDb()
   const taskRef = doc(collection(db, "tasks"))
-  await setDoc(taskRef, {
-    ...task,
-    task_id: taskRef.id,
-    last_updated: serverTimestamp(),
-  })
+  
+  // Filter out undefined values to avoid Firestore errors
+  const cleanTask = Object.fromEntries(
+    Object.entries({
+      ...task,
+      task_id: taskRef.id,
+      last_updated: serverTimestamp(),
+    }).filter(([_, value]) => value !== undefined)
+  )
+  
+  await setDoc(taskRef, cleanTask)
   return taskRef.id
 }
 
@@ -225,16 +250,38 @@ export async function addTask(task: Omit<Task, "task_id" | "last_updated">): Pro
   try {
     const db = getDb()
     const taskRef = doc(collection(db, "tasks"))
+    
+    // Create the task data without undefined fields
+    const taskData = {
+      ...task,
+      task_id: taskRef.id,
+      last_updated: serverTimestamp(),
+      created_at: serverTimestamp(),
+      priority: task.priority || "Medium",
+      time_spent: 0,
+      dependencies: [],
+      tags: [],
+    }
+    
+    // Only add due_date if it's defined
+    if (task.due_date !== undefined) {
+      taskData.due_date = task.due_date
+    }
+    
+    await setDoc(taskRef, taskData)
+    
+    // Return the task with client-side dates for immediate UI update
     const newTask = {
       ...task,
       task_id: taskRef.id,
       last_updated: new Date(),
+      created_at: new Date(),
+      priority: task.priority || "Medium",
+      time_spent: 0,
+      dependencies: [],
+      tags: [],
     }
-    await setDoc(taskRef, {
-      ...task,
-      task_id: taskRef.id,
-      last_updated: serverTimestamp(),
-    })
+    
     return newTask as Task
   } catch (error) {
     console.error("Error adding task:", error)
@@ -248,11 +295,17 @@ export async function createTasks(tasks: Omit<Task, "task_id" | "last_updated">[
 
   for (const task of tasks) {
     const taskRef = doc(collection(db, "tasks"))
-    batch.set(taskRef, {
-      ...task,
-      task_id: taskRef.id,
-      last_updated: serverTimestamp(),
-    })
+    
+    // Filter out undefined values to avoid Firestore errors
+    const cleanTask = Object.fromEntries(
+      Object.entries({
+        ...task,
+        task_id: taskRef.id,
+        last_updated: serverTimestamp(),
+      }).filter(([_, value]) => value !== undefined)
+    )
+    
+    batch.set(taskRef, cleanTask)
   }
 
   await batch.commit()
@@ -260,10 +313,16 @@ export async function createTasks(tasks: Omit<Task, "task_id" | "last_updated">[
 
 export async function updateTask(taskId: string, updates: Partial<Task>): Promise<void> {
   const db = getDb()
-  await updateDoc(doc(db, "tasks", taskId), {
-    ...updates,
-    last_updated: serverTimestamp(),
-  })
+  
+  // Filter out undefined values to avoid Firestore errors
+  const cleanUpdates = Object.fromEntries(
+    Object.entries({
+      ...updates,
+      last_updated: serverTimestamp(),
+    }).filter(([_, value]) => value !== undefined)
+  )
+  
+  await updateDoc(doc(db, "tasks", taskId), cleanUpdates)
 }
 
 export async function deleteTask(taskId: string): Promise<void> {
@@ -400,4 +459,340 @@ export function subscribeToProjectMembers(memberIds: string[], callback: (member
     callback([])
     return () => {}
   }
+}
+
+// Milestones
+export async function createMilestone(milestone: Omit<Milestone, "milestone_id" | "created_at">): Promise<string> {
+  const db = getDb()
+  const milestoneRef = doc(collection(db, "milestones"))
+  await setDoc(milestoneRef, {
+    ...milestone,
+    milestone_id: milestoneRef.id,
+    created_at: serverTimestamp(),
+  })
+  return milestoneRef.id
+}
+
+export async function updateMilestone(milestoneId: string, updates: Partial<Milestone>): Promise<void> {
+  const db = getDb()
+  await updateDoc(doc(db, "milestones", milestoneId), updates)
+}
+
+export async function deleteMilestone(milestoneId: string): Promise<void> {
+  const db = getDb()
+  await deleteDoc(doc(db, "milestones", milestoneId))
+}
+
+export function subscribeToMilestones(projectId: string, callback: (milestones: Milestone[]) => void) {
+  try {
+    const db = getDb()
+    const q = query(collection(db, "milestones"), where("project_id", "==", projectId))
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const milestones = snapshot.docs.map((doc) => {
+          const data = doc.data()
+          return {
+            ...data,
+            deadline: data.deadline?.toDate?.() || new Date(),
+            created_at: data.created_at?.toDate?.() || new Date(),
+          } as Milestone
+        })
+        milestones.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
+        callback(milestones)
+      },
+      (error) => {
+        console.error("Error subscribing to milestones:", error)
+        callback([])
+      },
+    )
+  } catch {
+    callback([])
+    return () => {}
+  }
+}
+
+// Schedule Events
+export async function createScheduleEvent(event: Omit<ScheduleEvent, "event_id" | "created_at">): Promise<string> {
+  const db = getDb()
+  const eventRef = doc(collection(db, "schedule_events"))
+  await setDoc(eventRef, {
+    ...event,
+    event_id: eventRef.id,
+    start_time: event.start_time,
+    end_time: event.end_time,
+    created_at: serverTimestamp(),
+  })
+  return eventRef.id
+}
+
+export async function updateScheduleEvent(eventId: string, updates: Partial<ScheduleEvent>): Promise<void> {
+  const db = getDb()
+  await updateDoc(doc(db, "schedule_events", eventId), updates)
+}
+
+export async function deleteScheduleEvent(eventId: string): Promise<void> {
+  const db = getDb()
+  await deleteDoc(doc(db, "schedule_events", eventId))
+}
+
+export function subscribeToScheduleEvents(projectId: string, userId: string, callback: (events: ScheduleEvent[]) => void) {
+  try {
+    const db = getDb()
+    const q = query(
+      collection(db, "schedule_events"), 
+      where("project_id", "==", projectId),
+      where("user_id", "==", userId)
+    )
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const events = snapshot.docs.map((doc) => {
+          const data = doc.data()
+          return {
+            ...data,
+            start_time: data.start_time?.toDate?.() || new Date(),
+            end_time: data.end_time?.toDate?.() || new Date(),
+            created_at: data.created_at?.toDate?.() || new Date(),
+          } as ScheduleEvent
+        })
+        events.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+        callback(events)
+      },
+      (error) => {
+        console.error("Error subscribing to schedule events:", error)
+        callback([])
+      },
+    )
+  } catch {
+    callback([])
+    return () => {}
+  }
+}
+
+// Wellness Settings
+export async function saveWellnessSettings(settings: Omit<WellnessSettings, "created_at">): Promise<void> {
+  const db = getDb()
+  const settingsRef = doc(db, "wellness_settings", `${settings.project_id}_${settings.user_id}`)
+  await setDoc(settingsRef, {
+    ...settings,
+    created_at: serverTimestamp(),
+  })
+}
+
+export async function getWellnessSettings(projectId: string, userId: string): Promise<WellnessSettings | null> {
+  try {
+    const db = getDb()
+    const settingsDoc = await getDoc(doc(db, "wellness_settings", `${projectId}_${userId}`))
+    if (!settingsDoc.exists()) return null
+    const data = settingsDoc.data()
+    return {
+      ...data,
+      created_at: data.created_at?.toDate?.() || new Date(),
+    } as WellnessSettings
+  } catch (error) {
+    console.error("Error getting wellness settings:", error)
+    return null
+  }
+}
+
+// Helper function to create default milestones for a project
+export async function createDefaultMilestones(projectId: string, duration: "24h" | "48h"): Promise<void> {
+  const db = getDb()
+  const batch = writeBatch(db)
+  const now = new Date()
+  const durationHours = duration === "24h" ? 24 : 48
+
+  const milestones = [
+    {
+      name: "Idea Finalization",
+      description: "Complete idea analysis and feature planning",
+      type: "idea_submission" as const,
+      deadline: new Date(now.getTime() + (durationHours * 0.2) * 60 * 60 * 1000), // 20% through
+    },
+    {
+      name: "Prototype Development",
+      description: "Build working prototype with core features",
+      type: "prototype" as const,
+      deadline: new Date(now.getTime() + (durationHours * 0.7) * 60 * 60 * 1000), // 70% through
+    },
+    {
+      name: "Final Presentation",
+      description: "Complete project and prepare final presentation",
+      type: "final_presentation" as const,
+      deadline: new Date(now.getTime() + durationHours * 60 * 60 * 1000), // End of hackathon
+    },
+  ]
+
+  for (const milestone of milestones) {
+    const milestoneRef = doc(collection(db, "milestones"))
+    batch.set(milestoneRef, {
+      ...milestone,
+      milestone_id: milestoneRef.id,
+      project_id: projectId,
+      status: "upcoming",
+      created_at: serverTimestamp(),
+    })
+  }
+
+  await batch.commit()
+}
+
+// Shared Resources
+export async function uploadResource(resource: Omit<SharedResource, "resource_id" | "created_at">): Promise<string> {
+  const db = getDb()
+  const resourceRef = doc(collection(db, "shared_resources"))
+  
+  // Filter out undefined values to avoid Firestore errors
+  const cleanResource = Object.fromEntries(
+    Object.entries({
+      ...resource,
+      resource_id: resourceRef.id,
+      created_at: serverTimestamp(),
+    }).filter(([_, value]) => value !== undefined)
+  )
+  
+  await setDoc(resourceRef, cleanResource)
+  return resourceRef.id
+}
+
+export async function getProjectResources(projectId: string): Promise<SharedResource[]> {
+  try {
+    const db = getDb()
+    const q = query(collection(db, "shared_resources"), where("project_id", "==", projectId))
+    const snapshot = await getDocs(q)
+    return snapshot.docs.map(doc => ({
+      ...doc.data(),
+      created_at: doc.data().created_at?.toDate?.() || new Date(),
+    } as SharedResource))
+  } catch (error) {
+    console.error("Error getting resources:", error)
+    return []
+  }
+}
+
+export function subscribeToResources(projectId: string, callback: (resources: SharedResource[]) => void) {
+  try {
+    const db = getDb()
+    const q = query(collection(db, "shared_resources"), where("project_id", "==", projectId))
+    return onSnapshot(q, (snapshot) => {
+      const resources = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        created_at: doc.data().created_at?.toDate?.() || new Date(),
+      } as SharedResource))
+      callback(resources)
+    })
+  } catch {
+    callback([])
+    return () => {}
+  }
+}
+
+// Live Activity Feed
+export async function addActivity(activity: Omit<LiveActivity, "activity_id" | "timestamp">): Promise<void> {
+  const db = getDb()
+  const activityRef = doc(collection(db, "live_activities"))
+  
+  // Filter out undefined values
+  const cleanActivity = Object.fromEntries(
+    Object.entries({
+      ...activity,
+      activity_id: activityRef.id,
+      timestamp: serverTimestamp(),
+    }).filter(([_, value]) => value !== undefined)
+  )
+  
+  await setDoc(activityRef, cleanActivity)
+}
+
+export function subscribeToActivities(projectId: string, callback: (activities: LiveActivity[]) => void) {
+  try {
+    const db = getDb()
+    const q = query(
+      collection(db, "live_activities"), 
+      where("project_id", "==", projectId)
+    )
+    return onSnapshot(q, (snapshot) => {
+      const activities = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate?.() || new Date(),
+      } as LiveActivity))
+      activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      callback(activities.slice(0, 50)) // Limit to 50 recent activities
+    })
+  } catch {
+    callback([])
+    return () => {}
+  }
+}
+
+// Team Notifications
+export async function createNotification(notification: Omit<TeamNotification, "notification_id" | "created_at">): Promise<void> {
+  const db = getDb()
+  const notificationRef = doc(collection(db, "team_notifications"))
+  
+  // Filter out undefined values
+  const cleanNotification = Object.fromEntries(
+    Object.entries({
+      ...notification,
+      notification_id: notificationRef.id,
+      created_at: serverTimestamp(),
+    }).filter(([_, value]) => value !== undefined)
+  )
+  
+  await setDoc(notificationRef, cleanNotification)
+}
+
+export function subscribeToNotifications(projectId: string, userId: string, callback: (notifications: TeamNotification[]) => void) {
+  try {
+    const db = getDb()
+    const q = query(
+      collection(db, "team_notifications"), 
+      where("project_id", "==", projectId),
+      where("user_id", "==", userId)
+    )
+    return onSnapshot(q, (snapshot) => {
+      const notifications = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        created_at: doc.data().created_at?.toDate?.() || new Date(),
+      } as TeamNotification))
+      notifications.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      callback(notifications)
+    })
+  } catch {
+    callback([])
+    return () => {}
+  }
+}
+
+export async function markNotificationRead(notificationId: string): Promise<void> {
+  const db = getDb()
+  await updateDoc(doc(db, "team_notifications", notificationId), { read: true })
+}
+
+export async function deleteResource(resourceId: string): Promise<void> {
+  const db = getDb()
+  await deleteDoc(doc(db, "shared_resources", resourceId))
+}
+
+export async function removeMemberFromProject(projectId: string, userId: string): Promise<void> {
+  const db = getDb()
+  const batch = writeBatch(db)
+
+  // Remove user from project members array
+  const projectRef = doc(db, "projects", projectId)
+  const projectDoc = await getDoc(projectRef)
+  
+  if (projectDoc.exists()) {
+    const currentMembers = projectDoc.data().members || []
+    const updatedMembers = currentMembers.filter((memberId: string) => memberId !== userId)
+    
+    batch.update(projectRef, { members: updatedMembers })
+  }
+
+  // Remove user's project role
+  const roleRef = doc(db, "project_roles", `${projectId}_${userId}`)
+  batch.delete(roleRef)
+
+  await batch.commit()
 }
