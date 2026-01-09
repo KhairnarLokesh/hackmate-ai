@@ -168,7 +168,7 @@ const responseCache = new Map<string, { result: string; timestamp: number }>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 interface GeminiRequest {
-  action: "analyze_idea" | "generate_tasks" | "mentor_chat"
+  action: "analyze_idea" | "generate_tasks" | "mentor_chat" | "generate_docs"
   data: {
     idea?: string
     features?: string[]
@@ -176,6 +176,8 @@ interface GeminiRequest {
     context?: string
     projectName?: string
     duration?: string
+    techStack?: string
+    description?: string
   }
 }
 
@@ -186,7 +188,7 @@ function cleanAndParseJSON(text: string, expectedType: 'object' | 'array'): any 
   try {
     // Remove markdown code blocks if present
     let cleaned = text.replace(/```json\s*|\s*```/g, '').trim()
-    
+
     // Extract JSON from text
     if (expectedType === 'object') {
       const match = cleaned.match(/\{[\s\S]*\}/)
@@ -195,14 +197,14 @@ function cleanAndParseJSON(text: string, expectedType: 'object' | 'array'): any 
       const match = cleaned.match(/\[[\s\S]*\]/)
       if (match) cleaned = match[0]
     }
-    
+
     // Fix common JSON issues
     cleaned = cleaned
       .replace(/'/g, '"')  // Replace single quotes with double quotes
       .replace(/,\s*}/g, '}')  // Remove trailing commas in objects
       .replace(/,\s*]/g, ']')  // Remove trailing commas in arrays
       .replace(/([{,]\s*)(\w+):/g, '$1"$2":')  // Quote unquoted keys
-    
+
     return JSON.parse(cleaned)
   } catch (error) {
     console.error('JSON parsing failed:', error, 'Text:', text)
@@ -223,7 +225,7 @@ function getFallbackResponse(action: string, data: any): any {
         risks: ["Time constraints", "Technical complexity"],
         tech_stack_suggestions: ["JavaScript", "React", "Node.js"]
       }
-    
+
     case "generate_tasks":
       return [
         { title: "Set up project structure", description: "Initialize the project with basic folder structure", effort: "Low" },
@@ -233,7 +235,7 @@ function getFallbackResponse(action: string, data: any): any {
         { title: "Test and debug", description: "Fix bugs and ensure everything works properly", effort: "Medium" },
         { title: "Prepare presentation", description: "Create demo and presentation materials", effort: "Low" }
       ]
-    
+
     default:
       return null
   }
@@ -325,12 +327,12 @@ Return this EXACT JSON structure with NO extra text:
 
           result = await callAI(prompt)
           parsedResult = cleanAndParseJSON(result, 'object')
-          
+
           // Validate required fields
           if (!parsedResult.problem_statement || !Array.isArray(parsedResult.target_users)) {
             throw new Error('Invalid response structure')
           }
-          
+
           result = JSON.stringify(parsedResult)
           break
         }
@@ -353,19 +355,19 @@ Generate 6-8 realistic tasks. Use only "Low", "Medium", or "High" for effort.`
 
           result = await callAI(prompt)
           parsedResult = cleanAndParseJSON(result, 'array')
-          
+
           // Validate array structure
           if (!Array.isArray(parsedResult) || parsedResult.length === 0) {
             throw new Error('Invalid task array')
           }
-          
+
           // Validate each task
           parsedResult = parsedResult.map((task: any) => ({
             title: task.title || "Untitled Task",
             description: task.description || "No description provided",
             effort: ["Low", "Medium", "High"].includes(task.effort) ? task.effort : "Medium"
           }))
-          
+
           result = JSON.stringify(parsedResult)
           break
         }
@@ -384,13 +386,60 @@ Provide a helpful response in 3-5 sentences. Focus on actionable advice.`
           break
         }
 
+        case "generate_docs": {
+          const prompt = `You are a professional software documentation generator.
+Create complete, well-structured project documentation in a formal, academic, but simple student-friendly style.
+
+Project Details:
+Project Name: ${data.projectName}
+Tech Stack: ${data.techStack}
+Description: ${data.description}
+Features: ${data.features?.join(", ")}
+Context: ${data.context || "No additional context provided."}
+
+The documentation must include the following sections:
+1. Title Page
+2. Abstract
+3. Introduction
+4. Problem Statement
+5. Objectives
+6. Scope
+7. System Architecture (with Mermaid Diagram)
+8. Use Case Diagram (with Mermaid)
+9. Functional Requirements
+10. Non-Functional Requirements
+11. Modules Description
+12. Team Collaboration Workflow
+13. Technology Stack
+14. Conclusion
+
+IMPORTANT RULES:
+- Use clear academic formatting with proper headings
+- Keep language simple and professional
+- Generate diagrams using Mermaid syntax only
+- Do NOT use emojis in documentation
+- Make it suitable for college / project submission
+- Output everything in one structured document using Markdown
+
+System Architecture Diagram Format (Example):
+\`\`\`mermaid
+flowchart LR
+User --> Frontend
+Frontend --> Backend
+Backend --> Database
+\`\`\`
+`
+
+          result = await callAI(prompt)
+          break
+        }
+
         default:
           return NextResponse.json({ error: "Invalid action" }, { status: 400 })
       }
-
     } catch (aiError) {
       console.warn(`AI failed for ${action}, using fallback:`, aiError)
-      
+
       // Use fallback responses for structured data
       if (action === "analyze_idea" || action === "generate_tasks") {
         const fallback = getFallbackResponse(action, data)

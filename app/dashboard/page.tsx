@@ -32,6 +32,7 @@ import {
   CheckCircle2,
   RefreshCw,
   AlertTriangle,
+  FileText,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { formatDistanceToNow } from "date-fns"
@@ -373,6 +374,11 @@ export default function DashboardPage() {
               </div>
             </DialogContent>
           </Dialog>
+
+          <Button variant="outline" size="lg" onClick={() => router.push("/docs-generator")}>
+            <FileText className="h-5 w-5 mr-2" />
+            Generate Docs
+          </Button>
         </div>
 
         {/* Projects Grid */}
@@ -384,99 +390,101 @@ export default function DashboardPage() {
           </Button>
         </div>
 
-        {isLoadingProjects ? (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-              <p className="text-muted-foreground">Loading your projects...</p>
-            </CardContent>
-          </Card>
-        ) : loadError ? (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
-                <RefreshCw className="h-8 w-8 text-destructive" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">Could not load projects</h3>
-              <p className="text-muted-foreground text-center mb-6 max-w-sm">
-                There was a problem connecting to the database. Create a new project to get started.
-              </p>
-              <div className="flex gap-3">
-                <Button onClick={loadProjects}>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Try Again
-                </Button>
-                <Button variant="outline" onClick={() => setCreateDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create New Project
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : projects.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
-                <FolderOpen className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">No projects yet</h3>
-              <p className="text-muted-foreground text-center mb-6 max-w-sm">
-                Create your first project or join an existing one with a code from your team.
-              </p>
-              <div className="flex gap-3">
-                <Button onClick={() => setCreateDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Project
-                </Button>
-                <Button variant="outline" onClick={() => setJoinDialogOpen(true)}>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Join Project
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.map((project) => (
-              <Card
-                key={project.project_id}
-                className="hover:shadow-lg transition-shadow cursor-pointer group"
-                onClick={() => router.push(`/project/${project.project_id}`)}
-              >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-xl group-hover:text-primary transition-colors">
-                        {project.name}
-                      </CardTitle>
-                      <CardDescription className="mt-1">
-                        {project.created_at && formatDistanceToNow(project.created_at, { addSuffix: true })}
-                      </CardDescription>
-                    </div>
-                    <Badge variant={project.demo_mode ? "default" : "secondary"}>
-                      {project.demo_mode ? "Demo Mode" : project.duration}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Users className="h-4 w-4" />
-                        {project.members.length}
+        {
+          isLoadingProjects ? (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center justify-center py-16">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+                <p className="text-muted-foreground">Loading your projects...</p>
+              </CardContent>
+            </Card>
+          ) : loadError ? (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center justify-center py-16">
+                <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+                  <RefreshCw className="h-8 w-8 text-destructive" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Could not load projects</h3>
+                <p className="text-muted-foreground text-center mb-6 max-w-sm">
+                  There was a problem connecting to the database. Create a new project to get started.
+                </p>
+                <div className="flex gap-3">
+                  <Button onClick={loadProjects}>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Try Again
+                  </Button>
+                  <Button variant="outline" onClick={() => setCreateDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create New Project
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : projects.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center justify-center py-16">
+                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <FolderOpen className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">No projects yet</h3>
+                <p className="text-muted-foreground text-center mb-6 max-w-sm">
+                  Create your first project or join an existing one with a code from your team.
+                </p>
+                <div className="flex gap-3">
+                  <Button onClick={() => setCreateDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Project
+                  </Button>
+                  <Button variant="outline" onClick={() => setJoinDialogOpen(true)}>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Join Project
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {projects.map((project) => (
+                <Card
+                  key={project.project_id}
+                  className="hover:shadow-lg transition-shadow cursor-pointer group"
+                  onClick={() => router.push(`/project/${project.project_id}`)}
+                >
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle className="text-xl group-hover:text-primary transition-colors">
+                          {project.name}
+                        </CardTitle>
+                        <CardDescription className="mt-1">
+                          {project.created_at && formatDistanceToNow(project.created_at, { addSuffix: true })}
+                        </CardDescription>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        {project.duration}
-                      </div>
+                      <Badge variant={project.demo_mode ? "default" : "secondary"}>
+                        {project.demo_mode ? "Demo Mode" : project.duration}
+                      </Badge>
                     </div>
-                    <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Users className="h-4 w-4" />
+                          {project.members.length}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-4 w-4" />
+                          {project.duration}
+                        </div>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )
+        }
       </main>
     </div>
   )

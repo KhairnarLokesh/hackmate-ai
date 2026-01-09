@@ -200,20 +200,20 @@ export default function ProjectPage() {
 
   // Calculate time remaining
   const [currentTime, setCurrentTime] = useState(new Date())
-  
+
   const timeRemaining = useMemo(() => {
     if (!project) return "Loading..."
-    
+
     const start = new Date(project.created_at)
     const duration = project.duration === "24h" ? 24 : 48
     const end = new Date(start.getTime() + duration * 60 * 60 * 1000)
     const remaining = end.getTime() - currentTime.getTime()
-    
+
     if (remaining <= 0) return "Time's up! ⏰"
-    
+
     const hours = Math.floor(remaining / (1000 * 60 * 60))
     const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60))
-    
+
     return `${hours}h ${minutes}m remaining`
   }, [project?.created_at, project?.duration, currentTime])
 
@@ -373,12 +373,12 @@ export default function ProjectPage() {
         console.error("JSON parsing failed:", data.result)
         throw new Error("AI returned invalid response format. Please try again.")
       }
-      
+
       // Validate required fields
       if (!analysis.problem_statement || !Array.isArray(analysis.target_users)) {
         throw new Error("Incomplete analysis received. Please try again.")
       }
-      
+
       await updateProjectIdea(projectId, analysis)
       setProject((prev) => (prev ? { ...prev, idea: analysis } : prev))
 
@@ -427,7 +427,7 @@ export default function ProjectPage() {
         console.error("JSON parsing failed:", data.result)
         throw new Error("AI returned invalid response format. Please try again.")
       }
-      
+
       // Validate the response structure
       if (!Array.isArray(generatedTasks)) {
         throw new Error("Invalid response format from AI")
@@ -518,10 +518,10 @@ export default function ProjectPage() {
 
     // Optimistic update
     setTasks((prev) => prev.map((t) => (t.task_id === taskId ? { ...t, status } : t)))
-    
+
     try {
       await updateTask(taskId, { status })
-      
+
       // Add activity
       await addActivity({
         project_id: projectId,
@@ -606,7 +606,7 @@ export default function ProjectPage() {
     // Map droppable IDs to status values
     const statusMap: Record<string, Task["status"]> = {
       "todo-column": "ToDo",
-      "inprogress-column": "InProgress", 
+      "inprogress-column": "InProgress",
       "done-column": "Done"
     }
 
@@ -781,12 +781,12 @@ export default function ProjectPage() {
         }
         return
       }
-      
+
       setSelectedFile(file)
       if (!resourceName.trim()) {
         setResourceName(file.name)
       }
-      
+
       // Convert file to base64 for storage
       const reader = new FileReader()
       reader.onload = (e) => {
@@ -863,7 +863,7 @@ export default function ProjectPage() {
 
   const handleDeleteResource = async (resource: SharedResource) => {
     if (!user) return
-    
+
     // Check if user is the uploader
     if (resource.uploaded_by !== user.uid) {
       toast({
@@ -876,7 +876,7 @@ export default function ProjectPage() {
 
     try {
       await deleteResource(resource.resource_id)
-      
+
       // Add activity
       await addActivity({
         project_id: projectId,
@@ -884,7 +884,7 @@ export default function ProjectPage() {
         type: "file_upload",
         description: `Deleted ${resource.type}: ${resource.name}`,
       })
-      
+
       toast({
         title: "Resource deleted",
         description: `${resource.name} has been removed.`,
@@ -901,7 +901,7 @@ export default function ProjectPage() {
 
   const handleRemoveMember = async (memberId: string, memberName: string) => {
     if (!user || !project) return
-    
+
     // Check if user is the project creator
     if (project.created_by !== user.uid) {
       toast({
@@ -946,7 +946,7 @@ export default function ProjectPage() {
     setIsRemovingMember(true)
     try {
       await removeMemberFromProject(projectId, memberToRemove.user_id)
-      
+
       // Add activity
       await addActivity({
         project_id: projectId,
@@ -954,7 +954,7 @@ export default function ProjectPage() {
         type: "status_change",
         description: `Removed ${memberToRemove.name} from the team`,
       })
-      
+
       toast({
         title: "Member removed",
         description: `${memberToRemove.name} has been removed from the project.`,
@@ -988,18 +988,18 @@ export default function ProjectPage() {
           })
           return
         }
-        
+
         // Try direct data URL download
         const fileName = resource.original_name || resource.name
         const link = document.createElement('a')
         link.href = resource.content
         link.download = fileName
         link.style.display = 'none'
-        
+
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
-        
+
         toast({
           title: "Download started",
           description: `Downloading ${fileName}`,
@@ -1071,7 +1071,7 @@ export default function ProjectPage() {
         fileInputRef.current.value = ""
       }
       setResourceDialogOpen(false)
-      
+
       toast({
         title: "Resource added!",
         description: `${resourceType} has been shared with the team.`,
@@ -1138,8 +1138,8 @@ export default function ProjectPage() {
                   <Badge variant="outline">{project.duration}</Badge>
                   <div className="flex items-center gap-1">
                     <span>Code:</span>
-                    <Badge 
-                      variant="outline" 
+                    <Badge
+                      variant="outline"
                       className="cursor-pointer hover:bg-accent transition-colors"
                       onClick={handleCopyJoinCode}
                     >
@@ -1201,7 +1201,7 @@ export default function ProjectPage() {
                           <li>• Project analytics and history</li>
                         </ul>
                       </div>
-                      
+
                       <div className="space-y-2">
                         <Label>Type the project name to confirm:</Label>
                         <Input
@@ -1214,7 +1214,7 @@ export default function ProjectPage() {
                           Type: <code className="bg-muted px-1 rounded">{project.name}</code>
                         </p>
                       </div>
-                      
+
                       <div className="flex gap-2 pt-2">
                         <Button
                           variant="outline"
@@ -1269,7 +1269,7 @@ export default function ProjectPage() {
                           <p className="text-sm text-muted-foreground">{memberToRemove.email}</p>
                         </div>
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <p className="font-medium text-muted-foreground">Role</p>
@@ -1278,10 +1278,9 @@ export default function ProjectPage() {
                         <div>
                           <p className="font-medium text-muted-foreground">Status</p>
                           <div className="flex items-center gap-2">
-                            <div className={`h-2 w-2 rounded-full ${
-                              memberToRemove.availability === "available" ? "bg-green-500" :
+                            <div className={`h-2 w-2 rounded-full ${memberToRemove.availability === "available" ? "bg-green-500" :
                               memberToRemove.availability === "busy" ? "bg-yellow-500" : "bg-red-500"
-                            }`} />
+                              }`} />
                             <span className="capitalize">{memberToRemove.availability || "available"}</span>
                           </div>
                         </div>
@@ -1299,7 +1298,7 @@ export default function ProjectPage() {
                         <li>• They won't be able to rejoin without a new invite</li>
                       </ul>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label>Type the member's name to confirm removal:</Label>
                       <Input
@@ -1312,7 +1311,7 @@ export default function ProjectPage() {
                         Type: <code className="bg-muted px-1 rounded">{memberToRemove.name}</code>
                       </p>
                     </div>
-                    
+
                     <div className="flex gap-2 pt-2">
                       <Button
                         variant="outline"
@@ -1544,7 +1543,7 @@ export default function ProjectPage() {
                       onChange={(e) => setNewTaskDescription(e.target.value)}
                       rows={3}
                     />
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Effort Level</Label>
@@ -1559,7 +1558,7 @@ export default function ProjectPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                      
+
                       <div className="space-y-2">
                         <Label>Priority</Label>
                         <Select value={newTaskPriority} onValueChange={(value) => setNewTaskPriority(value as "Low" | "Medium" | "High" | "Critical")}>
@@ -1575,7 +1574,7 @@ export default function ProjectPage() {
                         </Select>
                       </div>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label>Assign to</Label>
                       <Select value={newTaskAssignee || "unassigned"} onValueChange={(value) => setNewTaskAssignee(value === "unassigned" ? null : value)}>
@@ -1587,7 +1586,7 @@ export default function ProjectPage() {
                                 return member ? (
                                   <div className="flex items-center gap-2">
                                     <div className="h-4 w-4 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                                      {member.name.charAt(0).toUpperCase()}
+                                      {member?.name ? member.name.charAt(0).toUpperCase() : "?"}
                                     </div>
                                     <span>{member.name}</span>
                                   </div>
@@ -1602,11 +1601,11 @@ export default function ProjectPage() {
                           <SelectItem value="unassigned">
                             <span className="text-muted-foreground">Unassigned</span>
                           </SelectItem>
-                          {members.map((member) => (
-                            <SelectItem key={member.user_id} value={member.user_id}>
+                          {members.map((member, i) => (
+                            <SelectItem key={`${member.user_id}-${i}`} value={member.user_id}>
                               <div className="flex items-center gap-2">
                                 <div className="h-4 w-4 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                                  {member.name.charAt(0).toUpperCase()}
+                                  {member?.name ? member.name.charAt(0).toUpperCase() : "?"}
                                 </div>
                                 <span>{member.name}</span>
                               </div>
@@ -1615,7 +1614,7 @@ export default function ProjectPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    
+
                     <Button onClick={handleAddTask} disabled={!newTaskTitle.trim() || isAddingTask} className="w-full">
                       {isAddingTask ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add Task"}
                     </Button>
@@ -1740,12 +1739,12 @@ export default function ProjectPage() {
                       Started: {project.created_at ? new Date(project.created_at).toLocaleDateString() : "Unknown"}
                     </div>
                     <div className="w-full bg-muted rounded-full h-2">
-                      <div 
-                        className="bg-primary h-2 rounded-full transition-all duration-300" 
+                      <div
+                        className="bg-primary h-2 rounded-full transition-all duration-300"
                         style={{
-                          width: `${Math.max(0, Math.min(100, 
-                            ((new Date().getTime() - new Date(project.created_at).getTime()) / 
-                            ((project.duration === "24h" ? 24 : 48) * 60 * 60 * 1000)) * 100
+                          width: `${Math.max(0, Math.min(100,
+                            ((new Date().getTime() - new Date(project.created_at).getTime()) /
+                              ((project.duration === "24h" ? 24 : 48) * 60 * 60 * 1000)) * 100
                           ))}%`
                         }}
                       />
@@ -1770,9 +1769,9 @@ export default function ProjectPage() {
                         <div className="text-sm text-muted-foreground">
                           Started: {currentWorkSession.start.toLocaleTimeString()}
                         </div>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="mt-2"
                           onClick={() => setCurrentWorkSession(null)}
                         >
@@ -1783,8 +1782,8 @@ export default function ProjectPage() {
                     ) : (
                       <div className="text-center">
                         <div className="text-lg font-medium text-muted-foreground">No Active Session</div>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           className="mt-2"
                           onClick={() => setCurrentWorkSession({ start: new Date(), duration: 25 })}
                         >
@@ -1793,7 +1792,7 @@ export default function ProjectPage() {
                         </Button>
                       </div>
                     )}
-                    
+
                     {nextBreakTime && (
                       <div className="text-center p-3 bg-amber-50 border border-amber-200 rounded-lg">
                         <div className="text-sm font-medium text-amber-800">Next Break</div>
@@ -1826,23 +1825,23 @@ export default function ProjectPage() {
                         { name: "Testing & Polish", percent: 20, icon: Target, color: "text-green-600" },
                         { name: "Presentation Prep", percent: 15, icon: Users, color: "text-purple-600" }
                       ]
-                      
+
                       let currentPercent = 0
                       return phases.map((phase, i) => {
                         const phaseStart = new Date(start.getTime() + (currentPercent / 100) * duration * 60 * 60 * 1000)
                         const phaseEnd = new Date(start.getTime() + ((currentPercent + phase.percent) / 100) * duration * 60 * 60 * 1000)
                         currentPercent += phase.percent
-                        
+
                         const Icon = phase.icon
                         const isActive = new Date() >= phaseStart && new Date() <= phaseEnd
-                        
+
                         return (
                           <div key={i} className={`flex items-center gap-3 p-3 rounded-lg border ${isActive ? 'bg-primary/5 border-primary/20' : 'bg-muted/30'}`}>
                             <Icon className={`h-5 w-5 ${phase.color}`} />
                             <div className="flex-1">
                               <div className="font-medium">{phase.name}</div>
                               <div className="text-sm text-muted-foreground">
-                                {phaseStart.toLocaleDateString()} {phaseStart.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {phaseEnd.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                {phaseStart.toLocaleDateString()} {phaseStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {phaseEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </div>
                             </div>
                             <Badge variant={isActive ? "default" : "secondary"}>
@@ -1870,8 +1869,8 @@ export default function ProjectPage() {
                   <div className="text-2xl font-bold">{doneTasks.length}/{tasks.length}</div>
                   <div className="text-xs text-muted-foreground">Tasks Completed</div>
                   <div className="w-full bg-muted rounded-full h-2 mt-2">
-                    <div 
-                      className="bg-green-500 h-2 rounded-full transition-all duration-300" 
+                    <div
+                      className="bg-green-500 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${tasks.length > 0 ? (doneTasks.length / tasks.length) * 100 : 0}%` }}
                     />
                   </div>
@@ -1910,7 +1909,7 @@ export default function ProjectPage() {
                     <div className="flex -space-x-1">
                       {members.slice(0, 3).map((member, i) => (
                         <div key={i} className="h-6 w-6 rounded-full bg-primary/20 border-2 border-background flex items-center justify-center text-xs font-bold text-primary">
-                          {member.name.charAt(0).toUpperCase()}
+                          {member?.name ? member.name.charAt(0).toUpperCase() : "?"}
                         </div>
                       ))}
                       {members.length > 3 && (
@@ -1962,8 +1961,8 @@ export default function ProjectPage() {
                       <span className="text-sm">To Do</span>
                       <div className="flex items-center gap-2">
                         <div className="w-24 bg-muted rounded-full h-2">
-                          <div 
-                            className="bg-slate-500 h-2 rounded-full" 
+                          <div
+                            className="bg-slate-500 h-2 rounded-full"
                             style={{ width: `${tasks.length > 0 ? (todoTasks.length / tasks.length) * 100 : 0}%` }}
                           />
                         </div>
@@ -1974,8 +1973,8 @@ export default function ProjectPage() {
                       <span className="text-sm">In Progress</span>
                       <div className="flex items-center gap-2">
                         <div className="w-24 bg-muted rounded-full h-2">
-                          <div 
-                            className="bg-blue-500 h-2 rounded-full" 
+                          <div
+                            className="bg-blue-500 h-2 rounded-full"
                             style={{ width: `${tasks.length > 0 ? (inProgressTasks.length / tasks.length) * 100 : 0}%` }}
                           />
                         </div>
@@ -1986,8 +1985,8 @@ export default function ProjectPage() {
                       <span className="text-sm">Done</span>
                       <div className="flex items-center gap-2">
                         <div className="w-24 bg-muted rounded-full h-2">
-                          <div 
-                            className="bg-green-500 h-2 rounded-full" 
+                          <div
+                            className="bg-green-500 h-2 rounded-full"
                             style={{ width: `${tasks.length > 0 ? (doneTasks.length / tasks.length) * 100 : 0}%` }}
                           />
                         </div>
@@ -2065,9 +2064,8 @@ export default function ProjectPage() {
                         className={`flex ${msg.sender_type === "user" ? "justify-end" : "justify-start"}`}
                       >
                         <div
-                          className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                            msg.sender_type === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
-                          }`}
+                          className={`max-w-[80%] rounded-lg px-4 py-2 ${msg.sender_type === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
+                            }`}
                         >
                           <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                         </div>
@@ -2118,11 +2116,11 @@ export default function ProjectPage() {
                 <CardContent>
                   <div className="space-y-4">
                     {members.length > 0 ? (
-                      members.map((member) => (
-                        <div key={member.user_id} className="flex items-center justify-between p-4 border rounded-lg">
+                      members.map((member, i) => (
+                        <div key={`${member.user_id}-${i}`} className="flex items-center justify-between p-4 border rounded-lg">
                           <div className="flex items-center gap-3">
                             <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-lg">
-                              {member.name.charAt(0).toUpperCase()}
+                              {member?.name ? member.name.charAt(0).toUpperCase() : "?"}
                             </div>
                             <div>
                               <p className="font-medium">{member.name}</p>
@@ -2132,10 +2130,9 @@ export default function ProjectPage() {
                                   {member.role || "Member"}
                                 </Badge>
                                 <div className="flex items-center gap-1">
-                                  <div className={`h-2 w-2 rounded-full ${
-                                    member.availability === "available" ? "bg-green-500" :
+                                  <div className={`h-2 w-2 rounded-full ${member.availability === "available" ? "bg-green-500" :
                                     member.availability === "busy" ? "bg-yellow-500" : "bg-red-500"
-                                  }`} />
+                                    }`} />
                                   <span className="text-xs text-muted-foreground capitalize">
                                     {member.availability || "available"}
                                   </span>
@@ -2152,9 +2149,9 @@ export default function ProjectPage() {
                               </Button>
                             )}
                             {project.created_by === user?.uid && member.user_id !== user?.uid && (
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => handleRemoveMember(member.user_id, member.name)}
                                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
                               >
@@ -2194,7 +2191,7 @@ export default function ProjectPage() {
                       />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label>Demo URL</Label>
                     <div className="flex gap-2">
@@ -2236,7 +2233,7 @@ export default function ProjectPage() {
                               </SelectContent>
                             </Select>
                           </div>
-                          
+
                           <div className="space-y-2">
                             <Label>Skills (comma-separated)</Label>
                             <Input
@@ -2245,7 +2242,7 @@ export default function ProjectPage() {
                               onChange={(e) => setProfileSkills(e.target.value)}
                             />
                           </div>
-                          
+
                           <div className="space-y-2">
                             <Label>Availability</Label>
                             <Select value={profileAvailability} onValueChange={(value) => setProfileAvailability(value as any)}>
@@ -2259,7 +2256,7 @@ export default function ProjectPage() {
                               </SelectContent>
                             </Select>
                           </div>
-                          
+
                           <div className="space-y-2">
                             <Label>GitHub Username</Label>
                             <Input
@@ -2268,7 +2265,7 @@ export default function ProjectPage() {
                               onChange={(e) => setProfileGithub(e.target.value)}
                             />
                           </div>
-                          
+
                           <Button onClick={handleUpdateProfile} className="w-full">
                             Update Profile
                           </Button>
@@ -2311,7 +2308,7 @@ export default function ProjectPage() {
                             onChange={(e) => setResourceName(e.target.value)}
                           />
                         </div>
-                        
+
                         <div className="space-y-2">
                           <Label>Type</Label>
                           <Select value={resourceType} onValueChange={(value) => setResourceType(value as any)}>
@@ -2325,7 +2322,7 @@ export default function ProjectPage() {
                             </SelectContent>
                           </Select>
                         </div>
-                        
+
                         {resourceType === "link" && (
                           <div className="space-y-2">
                             <Label>URL</Label>
@@ -2336,7 +2333,7 @@ export default function ProjectPage() {
                             />
                           </div>
                         )}
-                        
+
                         {resourceType === "file" && (
                           <div className="space-y-2">
                             <Label>File</Label>
@@ -2353,7 +2350,7 @@ export default function ProjectPage() {
                             )}
                           </div>
                         )}
-                        
+
                         {resourceType === "note" && (
                           <div className="space-y-2">
                             <Label>Content</Label>
@@ -2365,14 +2362,14 @@ export default function ProjectPage() {
                             />
                           </div>
                         )}
-                        
-                        <Button 
-                          onClick={handleAddResource} 
-                          disabled={!resourceName.trim() || isUploadingResource || 
+
+                        <Button
+                          onClick={handleAddResource}
+                          disabled={!resourceName.trim() || isUploadingResource ||
                             (resourceType === "link" && !resourceUrl.trim()) ||
                             (resourceType === "note" && !resourceContent.trim()) ||
                             (resourceType === "file" && !selectedFile)
-                          } 
+                          }
                           className="w-full"
                         >
                           {isUploadingResource ? (
@@ -2395,7 +2392,7 @@ export default function ProjectPage() {
                     resources.map((resource) => {
                       const uploader = members.find(m => m.user_id === resource.uploaded_by)
                       const canDelete = resource.uploaded_by === user?.uid
-                      
+
                       return (
                         <Card key={resource.resource_id} className="relative">
                           <CardContent className="p-4">
@@ -2417,11 +2414,11 @@ export default function ProjectPage() {
                                 </Button>
                               )}
                             </div>
-                            
+
                             <p className="text-xs text-muted-foreground mb-3">
                               By {uploader?.name || "Unknown"} • {new Date(resource.created_at).toLocaleDateString()}
                             </p>
-                            
+
                             <div className="flex gap-2">
                               {resource.type === "link" && resource.url && (
                                 <Button variant="outline" size="sm" asChild className="flex-1">
@@ -2431,11 +2428,11 @@ export default function ProjectPage() {
                                   </a>
                                 </Button>
                               )}
-                              
+
                               {resource.type === "file" && (
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
+                                <Button
+                                  variant="outline"
+                                  size="sm"
                                   onClick={() => handleDownloadFile(resource)}
                                   className="flex-1"
                                 >
@@ -2443,7 +2440,7 @@ export default function ProjectPage() {
                                   Download
                                 </Button>
                               )}
-                              
+
                               {resource.type === "note" && resource.content && (
                                 <Dialog>
                                   <DialogTrigger asChild>
@@ -2513,8 +2510,8 @@ function DroppableColumn({
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent 
-        ref={setNodeRef} 
+      <CardContent
+        ref={setNodeRef}
         className={`space-y-2 min-h-[200px] ${isOver ? "bg-primary/10" : ""} transition-all duration-100 ease-out rounded-md`}
       >
         {children}
@@ -2548,7 +2545,7 @@ function TaskCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ 
+  } = useSortable({
     id: task.task_id,
     transition: {
       duration: 100, // Ultra-fast transition
@@ -2569,7 +2566,7 @@ function TaskCard({
 
   const priorityColors = {
     Low: "bg-blue-500/10 text-blue-600",
-    Medium: "bg-yellow-500/10 text-yellow-600", 
+    Medium: "bg-yellow-500/10 text-yellow-600",
     High: "bg-orange-500/10 text-orange-600",
     Critical: "bg-red-500/10 text-red-600"
   }
@@ -2582,16 +2579,15 @@ function TaskCard({
       style={style}
       {...attributes}
       {...listeners}
-      className={`p-3 bg-background border rounded-lg space-y-2 cursor-grab active:cursor-grabbing select-none ${
-        isDragging ? "opacity-70 shadow-2xl scale-110 z-50 rotate-3 ring-2 ring-primary/50" : "hover:shadow-lg hover:scale-[1.02]"
-      } transition-all duration-100 ease-out will-change-transform`}
+      className={`p-3 bg-background border rounded-lg space-y-2 cursor-grab active:cursor-grabbing select-none ${isDragging ? "opacity-70 shadow-2xl scale-110 z-50 rotate-3 ring-2 ring-primary/50" : "hover:shadow-lg hover:scale-[1.02]"
+        } transition-all duration-100 ease-out will-change-transform`}
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-medium flex-1 pointer-events-none">{task.title}</p>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-6 w-6 shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity duration-100" 
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity duration-100"
           onClick={(e) => {
             e.stopPropagation()
             e.preventDefault()
@@ -2601,30 +2597,32 @@ function TaskCard({
           <Trash2 className="h-3 w-3" />
         </Button>
       </div>
-      
+
       {task.description && (
         <p className="text-xs text-muted-foreground pointer-events-none">{task.description}</p>
       )}
-      
+
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Badge variant="secondary" className={`${effortColors[task.effort as keyof typeof effortColors] || ""} pointer-events-none transition-all duration-100`}>
+          <Badge variant="secondary" className={`${effortColors[task.effort as keyof typeof effortColors] || ""} pointer-events-none transition-all duration-100 flex items-center gap-1`} title="Effort">
+            <BarChart3 className="h-3 w-3" />
             {task.effort}
           </Badge>
           {task.priority && (
-            <Badge variant="outline" className={`${priorityColors[task.priority as keyof typeof priorityColors] || ""} pointer-events-none transition-all duration-100`}>
+            <Badge variant="outline" className={`${priorityColors[task.priority as keyof typeof priorityColors] || ""} pointer-events-none transition-all duration-100 flex items-center gap-1`} title="Priority">
+              <AlertTriangle className="h-3 w-3" />
               {task.priority}
             </Badge>
           )}
         </div>
-        
-        <Select 
-          value={task.status} 
+
+        <Select
+          value={task.status}
           onValueChange={(value) => {
             onStatusChange(task.task_id, value as Task["status"])
           }}
         >
-          <SelectTrigger 
+          <SelectTrigger
             className="h-7 w-28 text-xs pointer-events-auto transition-all duration-100 hover:bg-accent"
             onClick={(e) => {
               e.stopPropagation()
@@ -2644,14 +2642,14 @@ function TaskCard({
       {/* Member Assignment */}
       <div className="flex items-center justify-between gap-2 pt-1 border-t">
         <span className="text-xs text-muted-foreground pointer-events-none">Assigned to:</span>
-        <Select 
-          value={task.assigned_to || "unassigned"} 
+        <Select
+          value={task.assigned_to || "unassigned"}
           onValueChange={(value) => {
             const assignedTo = value === "unassigned" ? null : value
             onAssign(task.task_id, assignedTo)
           }}
         >
-          <SelectTrigger 
+          <SelectTrigger
             className="h-7 w-32 text-xs pointer-events-auto transition-all duration-100 hover:bg-accent"
             onClick={(e) => {
               e.stopPropagation()
@@ -2662,7 +2660,7 @@ function TaskCard({
               {assignedMember ? (
                 <div className="flex items-center gap-1">
                   <div className="h-4 w-4 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                    {assignedMember.name.charAt(0).toUpperCase()}
+                    {assignedMember?.name ? assignedMember.name.charAt(0).toUpperCase() : "?"}
                   </div>
                   <span className="truncate">{assignedMember.name}</span>
                 </div>
@@ -2675,16 +2673,20 @@ function TaskCard({
             <SelectItem value="unassigned">
               <span className="text-muted-foreground">Unassigned</span>
             </SelectItem>
-            {members.map((member) => (
-              <SelectItem key={member.user_id} value={member.user_id}>
-                <div className="flex items-center gap-2">
-                  <div className="h-4 w-4 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                    {member.name.charAt(0).toUpperCase()}
+            {members.map((member, i) => {
+              const id = member?.user_id ?? `member-${i}`
+              const displayName = member?.name ?? "Unknown"
+              return (
+                <SelectItem key={`${id}-${i}`} value={id}>
+                  <div className="flex items-center gap-2">
+                    <div className="h-4 w-4 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
+                      {displayName ? displayName.charAt(0).toUpperCase() : "?"}
+                    </div>
+                    <span>{displayName}</span>
                   </div>
-                  <span>{member.name}</span>
-                </div>
-              </SelectItem>
-            ))}
+                </SelectItem>
+              )
+            })}
           </SelectContent>
         </Select>
       </div>
