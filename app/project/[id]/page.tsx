@@ -151,6 +151,7 @@ export default function ProjectPage() {
   const [newTaskDescription, setNewTaskDescription] = useState("")
   const [newTaskEffort, setNewTaskEffort] = useState<"Low" | "Medium" | "High">("Medium")
   const [newTaskPriority, setNewTaskPriority] = useState<"Low" | "Medium" | "High" | "Critical">("Medium")
+  const [newTaskEstimatedMinutes, setNewTaskEstimatedMinutes] = useState<string>("30")
   const [newTaskAssignee, setNewTaskAssignee] = useState<string | null>(null)
   const [isAddingTask, setIsAddingTask] = useState(false)
   const [addTaskDialogOpen, setAddTaskDialogOpen] = useState(false)
@@ -203,6 +204,15 @@ export default function ProjectPage() {
 
   // Commit count state for health score
   const [commitsCount, setCommitsCount] = useState(0)
+
+  // Task editing state
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [editTaskTitle, setEditTaskTitle] = useState("")
+  const [editTaskDescription, setEditTaskDescription] = useState("")
+  const [editTaskEffort, setEditTaskEffort] = useState<"Low" | "Medium" | "High">("Medium")
+  const [editTaskPriority, setEditTaskPriority] = useState<"Low" | "Medium" | "High" | "Critical">("Medium")
+  const [editTaskEstimatedMinutes, setEditTaskEstimatedMinutes] = useState<string>("30")
+  const [isUpdatingTask, setIsUpdatingTask] = useState(false)
 
   // Hydration fix: track if component has mounted on client
   const [hasMounted, setHasMounted] = useState(false)
@@ -290,44 +300,6 @@ export default function ProjectPage() {
             console.error("Failed to load members:", err)
           }
         }
-
-        // Set up subscriptions after initial load
-        setTimeout(() => {
-          if (!mounted) return
-
-          const unsubProject = subscribeToProject(projectId, (p) => {
-            if (mounted && p) setProject(p)
-          })
-
-          const unsubTasks = subscribeToTasks(projectId, (t) => {
-            if (mounted) setTasks(t)
-          })
-
-          const unsubMessages = subscribeToMessages(projectId, (m) => {
-            if (mounted) setMessages(m)
-          })
-
-          const unsubResources = subscribeToResources(projectId, (r) => {
-            if (mounted) setResources(r)
-          })
-
-          const unsubActivities = subscribeToActivities(projectId, (a) => {
-            if (mounted) setActivities(a)
-          })
-
-          const unsubNotifications = subscribeToNotifications(projectId, user.uid, (n) => {
-            if (mounted) setNotifications(n)
-          })
-
-          return () => {
-            unsubProject()
-            unsubTasks()
-            unsubMessages()
-            unsubResources()
-            unsubActivities()
-            unsubNotifications()
-          }
-        }, 300)
       } catch (err: any) {
         if (mounted) {
           setError(err.message || "Failed to load project")
@@ -342,6 +314,54 @@ export default function ProjectPage() {
       mounted = false
     }
   }, [projectId, user, authLoading, router])
+
+  // Subscriptions effect
+  useEffect(() => {
+    if (authLoading || !user || !project) return
+
+    let mounted = true
+
+    const unsubs: (() => void)[] = []
+
+    try {
+      unsubs.push(subscribeToProject(projectId, (p) => {
+        if (mounted && p) setProject(p)
+      }))
+
+      unsubs.push(subscribeToTasks(projectId, (t) => {
+        if (mounted) setTasks(t)
+      }))
+
+      unsubs.push(subscribeToMessages(projectId, (m) => {
+        if (mounted) setMessages(m)
+      }))
+
+      unsubs.push(subscribeToResources(projectId, (r) => {
+        if (mounted) setResources(r)
+      }))
+
+      unsubs.push(subscribeToActivities(projectId, (a) => {
+        if (mounted) setActivities(a)
+      }))
+
+      unsubs.push(subscribeToNotifications(projectId, user.uid, (n) => {
+        if (mounted) setNotifications(n)
+      }))
+    } catch (err) {
+      console.error("Error setting up subscriptions:", err)
+    }
+
+    return () => {
+      mounted = false
+      unsubs.forEach((unsub) => {
+        try {
+          unsub()
+        } catch (e) {
+          // Ignore unsub errors
+        }
+      })
+    }
+  }, [projectId, user, authLoading, !!project])
 
   // Fetch commit count for health score
   useEffect(() => {
@@ -522,6 +542,7 @@ export default function ProjectPage() {
         status: "ToDo",
         effort: newTaskEffort,
         priority: newTaskPriority,
+        estimated_minutes: parseInt(newTaskEstimatedMinutes) || 0,
         assigned_to: newTaskAssignee,
       })
 
@@ -551,11 +572,26 @@ export default function ProjectPage() {
     const originalTask = tasks.find(t => t.task_id === taskId)
     if (!originalTask || !user) return
 
+    // Calculate time spent if moving to Done
+    let timeSpent = originalTask.time_spent || 0
+    let updates: any = { status }
+
+    if (status === "InProgress" && originalTask.status !== "InProgress") {
+      updates.started_at = new Date()
+    } else if (status === "Done" && originalTask.status === "InProgress" && originalTask.started_at) {
+      const start = new Date(originalTask.started_at).getTime()
+      const end = new Date().getTime()
+      const diffMinutes = Math.round((end - start) / (1000 * 60))
+      timeSpent += diffMinutes
+      updates.time_spent = timeSpent
+      updates.completed_at = new Date()
+    }
+
     // Optimistic update
-    setTasks((prev) => prev.map((t) => (t.task_id === taskId ? { ...t, status } : t)))
+    setTasks((prev) => prev.map((t) => (t.task_id === taskId ? { ...t, ...updates } : t)))
 
     try {
-      await updateTask(taskId, { status })
+      await updateTask(taskId, updates)
 
       // Add activity
       await addActivity({
@@ -619,6 +655,51 @@ export default function ProjectPage() {
         title: "Failed to delete task",
         variant: "destructive",
       })
+    }
+  }
+
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task)
+    setEditTaskTitle(task.title)
+    setEditTaskDescription(task.description || "")
+    setEditTaskEffort(task.effort as "Low" | "Medium" | "High")
+    setEditTaskPriority((task.priority as any) || "Medium")
+    setEditTaskEstimatedMinutes(String(task.estimated_minutes || 0))
+  }
+
+  const handleUpdateTask = async () => {
+    if (!editingTask || !editTaskTitle.trim() || !user) return
+
+    setIsUpdatingTask(true)
+    try {
+      const updates = {
+        title: editTaskTitle,
+        description: editTaskDescription,
+        effort: editTaskEffort,
+        priority: editTaskPriority,
+        estimated_minutes: parseInt(editTaskEstimatedMinutes) || 0,
+      }
+
+      await updateTask(editingTask.task_id, updates)
+
+      // Add activity
+      await addActivity({
+        project_id: projectId,
+        user_id: user.uid,
+        type: "task_update",
+        description: `Updated task details for "${editTaskTitle}"`,
+      })
+
+      setEditingTask(null)
+      toast({ title: "Task updated!" })
+    } catch (error: any) {
+      toast({
+        title: "Update failed",
+        description: error.message,
+        variant: "destructive",
+      })
+    } finally {
+      setIsUpdatingTask(false)
     }
   }
 
@@ -1630,46 +1711,55 @@ export default function ProjectPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                    </div>
+                      <div className="space-y-2">
+                        <Label>Estimated Time (minutes)</Label>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 60"
+                          value={newTaskEstimatedMinutes}
+                          onChange={(e) => setNewTaskEstimatedMinutes(e.target.value)}
+                        />
+                      </div>
 
-                    <div className="space-y-2">
-                      <Label>Assign to</Label>
-                      <Select value={newTaskAssignee || "unassigned"} onValueChange={(value) => setNewTaskAssignee(value === "unassigned" ? null : value)}>
-                        <SelectTrigger>
-                          <SelectValue>
-                            {newTaskAssignee ? (
-                              (() => {
-                                const member = members.find(m => m.user_id === newTaskAssignee)
-                                return member ? (
-                                  <div className="flex items-center gap-2">
-                                    <div className="h-4 w-4 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                                      {member?.name ? member.name.charAt(0).toUpperCase() : "?"}
+                      <div className="space-y-2">
+                        <Label>Assign to</Label>
+                        <Select value={newTaskAssignee || "unassigned"} onValueChange={(value) => setNewTaskAssignee(value === "unassigned" ? null : value)}>
+                          <SelectTrigger>
+                            <SelectValue>
+                              {newTaskAssignee ? (
+                                (() => {
+                                  const member = members.find(m => m.user_id === newTaskAssignee)
+                                  return member ? (
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-4 w-4 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
+                                        {member?.name ? member.name.charAt(0).toUpperCase() : "?"}
+                                      </div>
+                                      <span>{member.name}</span>
                                     </div>
-                                    <span>{member.name}</span>
-                                  </div>
-                                ) : "Unassigned"
-                              })()
-                            ) : (
-                              "Unassigned"
-                            )}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="unassigned">
-                            <span className="text-muted-foreground">Unassigned</span>
-                          </SelectItem>
-                          {members.map((member, i) => (
-                            <SelectItem key={`${member.user_id}-${i}`} value={member.user_id}>
-                              <div className="flex items-center gap-2">
-                                <div className="h-4 w-4 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                                  {member?.name ? member.name.charAt(0).toUpperCase() : "?"}
-                                </div>
-                                <span>{member.name}</span>
-                              </div>
+                                  ) : "Unassigned"
+                                })()
+                              ) : (
+                                "Unassigned"
+                              )}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="unassigned">
+                              <span className="text-muted-foreground">Unassigned</span>
                             </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                            {members.map((member, i) => (
+                              <SelectItem key={`${member.user_id}-${i}`} value={member.user_id}>
+                                <div className="flex items-center gap-2">
+                                  <div className="h-4 w-4 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
+                                    {member?.name ? member.name.charAt(0).toUpperCase() : "?"}
+                                  </div>
+                                  <span>{member.name}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
 
                     <Button onClick={handleAddTask} disabled={!newTaskTitle.trim() || isAddingTask} className="w-full">
@@ -1700,8 +1790,10 @@ export default function ProjectPage() {
                         task={task}
                         onStatusChange={handleUpdateTaskStatus}
                         onDelete={handleDeleteTask}
+                        onEdit={handleEditTask}
                         onAssign={handleAssignTask}
                         members={members}
+                        isAdmin={project.created_by === user?.uid}
                       />
                     ))}
                     {todoTasks.length === 0 && (
@@ -1724,8 +1816,10 @@ export default function ProjectPage() {
                         task={task}
                         onStatusChange={handleUpdateTaskStatus}
                         onDelete={handleDeleteTask}
+                        onEdit={handleEditTask}
                         onAssign={handleAssignTask}
                         members={members}
+                        isAdmin={project.created_by === user?.uid}
                       />
                     ))}
                     {inProgressTasks.length === 0 && (
@@ -1748,8 +1842,10 @@ export default function ProjectPage() {
                         task={task}
                         onStatusChange={handleUpdateTaskStatus}
                         onDelete={handleDeleteTask}
+                        onEdit={handleEditTask}
                         onAssign={handleAssignTask}
                         members={members}
+                        isAdmin={project.created_by === user?.uid}
                       />
                     ))}
                     {doneTasks.length === 0 && (
@@ -1776,6 +1872,79 @@ export default function ProjectPage() {
                   </div>
                 ) : null}
               </DragOverlay>
+              {/* Edit Task Dialog */}
+              <Dialog open={!!editingTask} onOpenChange={(open) => !open && setEditingTask(null)}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Edit Task</DialogTitle>
+                    <DialogDescription>Modify task details</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <div className="space-y-2">
+                      <Label>Title</Label>
+                      <Input
+                        placeholder="Task title"
+                        value={editTaskTitle}
+                        onChange={(e) => setEditTaskTitle(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Description</Label>
+                      <Textarea
+                        placeholder="Task description"
+                        value={editTaskDescription}
+                        onChange={(e) => setEditTaskDescription(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Effort Level</Label>
+                        <Select value={editTaskEffort} onValueChange={(value) => setEditTaskEffort(value as any)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Low">Low</SelectItem>
+                            <SelectItem value="Medium">Medium</SelectItem>
+                            <SelectItem value="High">High</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Priority</Label>
+                        <Select value={editTaskPriority} onValueChange={(value) => setEditTaskPriority(value as any)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Low">Low</SelectItem>
+                            <SelectItem value="Medium">Medium</SelectItem>
+                            <SelectItem value="High">High</SelectItem>
+                            <SelectItem value="Critical">Critical</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Estimated Time (minutes)</Label>
+                      <Input
+                        type="number"
+                        placeholder="e.g. 60"
+                        value={editTaskEstimatedMinutes}
+                        onChange={(e) => setEditTaskEstimatedMinutes(e.target.value)}
+                      />
+                    </div>
+
+                    <Button onClick={handleUpdateTask} disabled={!editTaskTitle.trim() || isUpdatingTask} className="w-full">
+                      {isUpdatingTask ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Changes"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </DndContext>
           </TabsContent>
           {/* Schedule Tab */}
@@ -2608,14 +2777,18 @@ function TaskCard({
   task,
   onStatusChange,
   onDelete,
+  onEdit,
   onAssign,
   members,
+  isAdmin,
 }: {
   task: Task
   onStatusChange: (id: string, status: Task["status"]) => void
   onDelete: (id: string) => void
+  onEdit: (task: Task) => void
   onAssign: (id: string, assignedTo: string | null) => void
   members: ProjectMember[]
+  isAdmin?: boolean
 }) {
   const {
     attributes,
@@ -2663,18 +2836,34 @@ function TaskCard({
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-medium flex-1 pointer-events-none">{task.title}</p>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity duration-100"
-          onClick={(e) => {
-            e.stopPropagation()
-            e.preventDefault()
-            onDelete(task.task_id)
-          }}
-        >
-          <Trash2 className="h-3 w-3" />
-        </Button>
+        <div className="flex items-center gap-1 shrink-0 pointer-events-auto">
+          {isAdmin && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 opacity-60 hover:opacity-100 transition-opacity duration-100"
+              onClick={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+                onEdit(task)
+              }}
+            >
+              <Settings className="h-3 w-3" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 opacity-60 hover:opacity-100 transition-opacity duration-100 text-red-600 hover:text-red-700 hover:bg-red-50"
+            onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              onDelete(task.task_id)
+            }}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </div>
       </div>
 
       {task.description && (
@@ -2691,6 +2880,12 @@ function TaskCard({
             <Badge variant="outline" className={`${priorityColors[task.priority as keyof typeof priorityColors] || ""} pointer-events-none transition-all duration-100 flex items-center gap-1`} title="Priority">
               <AlertTriangle className="h-3 w-3" />
               {task.priority}
+            </Badge>
+          )}
+          {(task.estimated_minutes ?? 0) > 0 && (
+            <Badge variant="outline" className="bg-slate-100 text-slate-700 pointer-events-none flex items-center gap-1" title="Estimate">
+              <Clock className="h-3 w-3" />
+              {task.estimated_minutes}m
             </Badge>
           )}
         </div>
@@ -2717,6 +2912,27 @@ function TaskCard({
           </SelectContent>
         </Select>
       </div>
+
+      {/* Actual Time Status */}
+      {(task.status === "InProgress" || task.status === "Done") && (
+        <div className="flex items-center gap-2 px-2 py-1 bg-muted/30 rounded text-[10px] font-medium">
+          <TrendingUp className="h-3 w-3 text-primary" />
+          {task.status === "InProgress" ? (
+            <span className="text-muted-foreground animate-pulse">In progress...</span>
+          ) : (
+            <div className="flex items-center gap-2 w-full justify-between">
+              <span className={task.time_spent && (task.estimated_minutes ?? 0) > 0 && task.time_spent > (task.estimated_minutes ?? 0) ? "text-red-500" : "text-green-600"}>
+                Actual: {task.time_spent || 0}m
+              </span>
+              {(task.estimated_minutes ?? 0) > 0 && task.time_spent && (
+                <span className="text-muted-foreground">
+                  ({Math.round((task.time_spent / (task.estimated_minutes ?? 1)) * 100)}% of est)
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Member Assignment */}
       <div className="flex items-center justify-between gap-2 pt-1 border-t">

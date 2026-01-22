@@ -122,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setDoc(doc(db, "users", user.uid), {
         ...profile,
         created_at: serverTimestamp(),
-      }).catch(() => {})
+      }).catch(() => { })
     }
   }
 
@@ -177,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!auth) return
 
     if (user && db) {
-      setDoc(doc(db, "users", user.uid), { online_status: false }, { merge: true }).catch(() => {})
+      setDoc(doc(db, "users", user.uid), { online_status: false }, { merge: true }).catch(() => { })
     }
     await signOut(auth)
     setUser(null)
@@ -189,7 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) {
       setUserProfile((prev) => (prev ? { ...prev, skills } : null))
       if (db) {
-        setDoc(doc(db, "users", user.uid), { skills }, { merge: true }).catch(() => {})
+        setDoc(doc(db, "users", user.uid), { skills }, { merge: true }).catch(() => { })
       }
     }
   }
@@ -199,7 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) {
       setUserProfile((prev) => (prev ? { ...prev, ...updates } : null))
       if (db) {
-        setDoc(doc(db, "users", user.uid), updates, { merge: true }).catch(() => {})
+        setDoc(doc(db, "users", user.uid), updates, { merge: true }).catch(() => { })
       }
     }
   }

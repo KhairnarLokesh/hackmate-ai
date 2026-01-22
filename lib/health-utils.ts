@@ -26,7 +26,7 @@ export function calculateProjectHealth(
 
     // 2. Time Pressure (25%)
     const start = new Date(project.created_at)
-    const duration = project.duration === "24h" ? 24 : 48
+    const duration = parseInt(project.duration) || 24
     const end = new Date(start.getTime() + duration * 60 * 60 * 1000)
     const totalDurationMs = duration * 60 * 60 * 1000
     const elapsedMs = now - start.getTime()
