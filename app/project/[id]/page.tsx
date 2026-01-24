@@ -100,7 +100,11 @@ import {
   Share2,
   Eye,
   Download,
+
   Trash,
+  Laptop,
+  Mic,
+  Zap,
 } from "lucide-react"
 
 interface RetryState {
@@ -158,7 +162,9 @@ export default function ProjectPage() {
 
   // Chat state
   const [chatInput, setChatInput] = useState("")
+
   const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [mentorMode, setMentorMode] = useState<"tech" | "pitch" | "hackathon">("tech")
 
   // Profile settings state
   const [profileDialogOpen, setProfileDialogOpen] = useState(false)
@@ -779,6 +785,7 @@ export default function ProjectPage() {
             data: {
               question: userMessage,
               context,
+              mode: mentorMode,
             },
           }),
         }),
@@ -2283,6 +2290,35 @@ export default function ProjectPage() {
                   AI Mentor Chat
                 </CardTitle>
                 <CardDescription>Get guidance on priorities, debugging, and presentation tips</CardDescription>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Button
+                    variant={mentorMode === "tech" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setMentorMode("tech")}
+                    className={`gap-2 ${mentorMode === "tech" ? "bg-primary/10 text-primary hover:bg-primary/20" : "text-muted-foreground"}`}
+                  >
+                    <Laptop className="h-3.5 w-3.5" />
+                    Tech Mentor
+                  </Button>
+                  <Button
+                    variant={mentorMode === "pitch" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setMentorMode("pitch")}
+                    className={`gap-2 ${mentorMode === "pitch" ? "bg-primary/10 text-primary hover:bg-primary/20" : "text-muted-foreground"}`}
+                  >
+                    <Mic className="h-3.5 w-3.5" />
+                    Pitch Coach
+                  </Button>
+                  <Button
+                    variant={mentorMode === "hackathon" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setMentorMode("hackathon")}
+                    className={`gap-2 ${mentorMode === "hackathon" ? "bg-primary/10 text-primary hover:bg-primary/20" : "text-muted-foreground"}`}
+                  >
+                    <Zap className="h-3.5 w-3.5" />
+                    Hackathon Coach
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col overflow-hidden">
                 <ScrollArea className="flex-1 pr-4">

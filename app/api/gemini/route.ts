@@ -155,10 +155,11 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY!
  * Gemini free is LAST because it rate-limits a lot
  */
 const FREE_MODELS = [
+  "google/gemini-2.0-flash-exp:free",
   "meta-llama/llama-3.2-3b-instruct:free",
   "mistralai/mistral-7b-instruct:free",
   "huggingfaceh4/zephyr-7b-beta:free",
-  "google/gemini-2.0-flash-exp:free",
+  "microsoft/phi-3-medium-128k-instruct:free",
 ]
 
 /**
@@ -178,6 +179,7 @@ interface GeminiRequest {
     duration?: string
     techStack?: string
     description?: string
+    mode?: "tech" | "pitch" | "hackathon"
   }
 }
 
@@ -200,7 +202,6 @@ function cleanAndParseJSON(text: string, expectedType: 'object' | 'array'): any 
 
     // Fix common JSON issues
     cleaned = cleaned
-      .replace(/'/g, '"')  // Replace single quotes with double quotes
       .replace(/,\s*}/g, '}')  // Remove trailing commas in objects
       .replace(/,\s*]/g, ']')  // Remove trailing commas in arrays
       .replace(/([{,]\s*)(\w+):/g, '$1"$2":')  // Quote unquoted keys
@@ -235,6 +236,9 @@ function getFallbackResponse(action: string, data: any): any {
         { title: "Test and debug", description: "Fix bugs and ensure everything works properly", effort: "Medium" },
         { title: "Prepare presentation", description: "Create demo and presentation materials", effort: "Low" }
       ]
+
+    case "mentor_chat":
+      return "I'm currently experiencing high traffic, but I'm here to help! try breaking your problem down into smaller steps. What specifically are you stuck on?"
 
     default:
       return null
@@ -296,6 +300,17 @@ export async function POST(request: NextRequest) {
   try {
     const body: GeminiRequest = await request.json()
     const { action, data } = body
+
+    // Handle missing API key - return fallback immediately
+    if (!OPENROUTER_API_KEY) {
+      console.warn("OPENROUTER_API_KEY missing, using fallback response")
+      const fallback = getFallbackResponse(action, data)
+      if (fallback) {
+        const result = typeof fallback === 'string' ? fallback : JSON.stringify(fallback)
+        return NextResponse.json({ result })
+      }
+      return NextResponse.json({ error: "AI service configuration missing" }, { status: 503 })
+    }
 
     const cacheKey = getCacheKey(action, data)
     const cached = responseCache.get(cacheKey)
@@ -373,13 +388,46 @@ Generate 6-8 realistic tasks. Use only "Low", "Medium", or "High" for effort.`
         }
 
         case "mentor_chat": {
-          const prompt = `You are HackMate AI mentor for hackathon teams.
-Be concise, practical, and actionable.
+          const mode = data.mode || "tech"
+          let systemPrompt = ""
+
+          switch (mode) {
+            case "pitch":
+              systemPrompt = `You are a dedicated Pitch Coach for a hackathon team.
+Your goal is to help them create a compelling demo and clear explanation.
+Focus on:
+- Storytelling and hook
+- Value proposition
+- Clear, non-technical explanations for judges
+- Impact and "wow" factor`
+              break
+            case "hackathon":
+              systemPrompt = `You are a Hackathon Coach focused on time management and delivery.
+Your goal is to ensure the team finishes on time with a working MVP.
+Focus on:
+- Prioritization (Must-have vs Nice-to-have)
+- Time boxing and efficiency
+- Cutting scope if needed
+- Keeping the team motivated and focused`
+              break
+            case "tech":
+            default:
+              systemPrompt = `You are a Tech Mentor for a hackathon team.
+Your goal is to help with debugging, architecture, and implementation details.
+Focus on:
+- Fixing bugs and errors
+- Suggesting libraries or snippets
+- explaining complex concepts simply
+- Best practices for speed and reliability`
+              break
+          }
+
+          const prompt = `${systemPrompt}
 
 Context: ${data.context || "Hackathon project"}
 Question: ${data.question}
 
-Provide a helpful response in 3-5 sentences. Focus on actionable advice.`
+Be concise, practical, and actionable. Provide a helpful response in 3-5 sentences.`
 
           result = await callAI(prompt)
           // For chat, we don't need JSON parsing
@@ -458,11 +506,11 @@ CRITICAL MERMAID RULES:
     } catch (aiError) {
       console.warn(`AI failed for ${action}, using fallback:`, aiError)
 
-      // Use fallback responses for structured data
-      if (action === "analyze_idea" || action === "generate_tasks") {
+      // Use fallback responses for structured data and chat
+      if (["analyze_idea", "generate_tasks", "mentor_chat"].includes(action)) {
         const fallback = getFallbackResponse(action, data)
         if (fallback) {
-          result = JSON.stringify(fallback)
+          result = typeof fallback === 'string' ? fallback : JSON.stringify(fallback)
         } else {
           throw aiError
         }
