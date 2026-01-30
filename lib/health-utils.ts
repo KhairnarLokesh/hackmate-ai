@@ -28,6 +28,9 @@ export function calculateProjectHealth(
     const start = new Date(project.created_at)
     const end = new Date(project.deadline)
     const totalDurationMs = end.getTime() - start.getTime()
+    const duration = parseInt(project.duration) || 24
+    const end = new Date(start.getTime() + duration * 60 * 60 * 1000)
+    const totalDurationMs = duration * 60 * 60 * 1000
     const elapsedMs = now - start.getTime()
     const progressRatio = Math.min(Math.max(elapsedMs / totalDurationMs, 0), 1)
 

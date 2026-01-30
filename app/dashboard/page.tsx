@@ -72,6 +72,8 @@ export default function DashboardPage() {
     d.setHours(d.getHours() + 48)
     return format(d, "HH:mm")
   })
+  const [newProjectDuration, setNewProjectDuration] = useState<string>("24h")
+  const [customDuration, setCustomDuration] = useState<string>("12")
   const [joinCode, setJoinCode] = useState("")
   const [creationStatus, setCreationStatus] = useState<CreationStatus>("idle")
   const [creationMessage, setCreationMessage] = useState("")
@@ -159,6 +161,8 @@ export default function DashboardPage() {
       deadline.setHours(hours, minutes)
 
       const projectId = await createProject(newProjectName.trim(), deadline, user.uid)
+      const finalDuration = newProjectDuration === "custom" ? `${customDuration}h` : newProjectDuration
+      const projectId = await createProject(newProjectName.trim(), finalDuration, user.uid)
 
       setCreationStatus("success")
       setCreationMessage("Project created!")
@@ -250,6 +254,8 @@ export default function DashboardPage() {
       d.setHours(d.getHours() + 48)
       setNewProjectDeadline(d)
       setNewProjectTime(format(d, "HH:mm"))
+      setNewProjectDuration("24h")
+      setCustomDuration("12")
     }
   }
 
@@ -530,8 +536,39 @@ export default function DashboardPage() {
                       <p className="text-xs text-muted-foreground">
                         Project will end on {newProjectDeadline && format(newProjectDeadline, "PP")} at {newProjectTime}
                       </p>
+                      <Label htmlFor="duration">Hackathon Duration</Label>
+                      <Select
+                        value={newProjectDuration}
+                        onValueChange={(v) => setNewProjectDuration(v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select duration" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="24h">24 Hours</SelectItem>
+                          <SelectItem value="48h">48 Hours</SelectItem>
+                          <SelectItem value="custom">Custom Hours</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <Button onClick={handleCreateProject} className="w-full" disabled={!newProjectName.trim()}>
+                    {newProjectDuration === "custom" && (
+                      <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
+                        <Label htmlFor="custom-duration">Specify Hours</Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            id="custom-duration"
+                            type="number"
+                            min="1"
+                            max="720"
+                            value={customDuration}
+                            onChange={(e) => setCustomDuration(e.target.value)}
+                            placeholder="e.g. 12"
+                          />
+                          <span className="text-sm font-medium text-muted-foreground shrink-0">Hours</span>
+                        </div>
+                      </div>
+                    )}
+                    <Button onClick={handleCreateProject} className="w-full" disabled={!newProjectName.trim() || (newProjectDuration === "custom" && (!customDuration || parseInt(customDuration) <= 0))}>
                       Create Project
                     </Button>
                   </>

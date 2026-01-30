@@ -40,6 +40,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
 
 // Projects
 export async function createProject(name: string, deadline: Date, userId: string): Promise<string> {
+export async function createProject(name: string, duration: string, userId: string): Promise<string> {
   const db = getDb()
   const projectRef = doc(collection(db, "projects"))
 
@@ -71,6 +72,7 @@ export async function createProject(name: string, deadline: Date, userId: string
 
   // Create default milestones in background
   createDefaultMilestones(projectRef.id, deadline).catch(() => { })
+  createDefaultMilestones(projectRef.id, duration).catch(() => { })
 
   return projectRef.id
 }
@@ -632,6 +634,11 @@ export async function createDefaultMilestones(projectId: string, deadline: Date)
   const batch = writeBatch(db)
   const now = new Date()
   const totalDuration = deadline.getTime() - now.getTime()
+export async function createDefaultMilestones(projectId: string, duration: string): Promise<void> {
+  const db = getDb()
+  const batch = writeBatch(db)
+  const now = new Date()
+  const durationHours = parseInt(duration) || 24
 
   const milestones = [
     {
