@@ -1,7 +1,10 @@
 export interface Project {
   project_id: string
   name: string
-  duration: "24h" | "48h"
+  /** @deprecated Use deadline instead */
+  duration?: "24h" | "48h"
+  deadline: Date
+  duration: string
   created_by: string
   members: string[]
   join_code: string
@@ -134,6 +137,9 @@ export interface Task {
   due_date?: Date
   priority: "Low" | "Medium" | "High" | "Critical"
   time_spent?: number // in minutes
+  estimated_minutes?: number // in minutes
+  started_at?: Date
+  completed_at?: Date
   dependencies?: string[] // task_ids that must be completed first
   tags?: string[]
 }
